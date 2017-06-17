@@ -173,13 +173,17 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     for (int i = 0; i < n_vars; i++) {
         vars[i] = 0;
     }
-    // Set the initial variable values
+    // Set the initial variable values.
+    // Actually this step is no necessary,
+    // since the constraint for this first step will be enforced below.
+    /*
     vars[x_start] = x;
     vars[y_start] = y;
     vars[psi_start] = psi;
     vars[v_start] = v;
     vars[cte_start] = cte;
     vars[epsi_start] = epsi;
+    */
     
     Dvector vars_lowerbound(n_vars);
     Dvector vars_upperbound(n_vars);

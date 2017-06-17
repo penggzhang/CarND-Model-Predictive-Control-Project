@@ -8,6 +8,7 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
 #include "json.hpp"
+#include <tuple>
 
 // for convenience
 using json = nlohmann::json;
@@ -65,6 +66,19 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
     return result;
 }
 
+// Transform coordinates
+std::tuple<vector<double>, vector<double>> transformCoord(vector<double> ptsx, vector<double> ptsy, double px, double py, double psi) {
+    vector<double> ptsx_veh;
+    vector<double> ptsy_veh;
+    for (int i = 0; i < ptsx.size(); i++) {
+        double shift_x = ptsx[i] - px;
+        double shift_y = ptsy[i] - py;
+        ptsx_veh.push_back(shift_x * cos(psi) + shift_y * sin(psi));
+        ptsy_veh.push_back(shift_x * (-sin(psi)) + shift_y * cos(psi));
+    }
+    return std::make_tuple(ptsx_veh, ptsy_veh);
+}
+
 // Define latency (second) and the vehicle length from front to CoG (m)
 double latency = 0.1;
 const double Lf = 2.67;
@@ -88,6 +102,10 @@ int main() {
                 auto j = json::parse(s);
                 string event = j[0].get<string>();
                 if (event == "telemetry") {
+                    
+                    // Set start timer to measure latency duration
+                    auto clock_start = chrono::system_clock::now();
+                    
                     // j[1] is the data JSON object
                     vector<double> ptsx = j[1]["ptsx"];
                     vector<double> ptsy = j[1]["ptsy"];
@@ -114,23 +132,17 @@ int main() {
                     // Predict the state after latency
                     px += v * cos(psi) * latency;
                     py += v * sin(psi) * latency;
-                    psi -= v / Lf * delta * latency;
+                    psi -= v / Lf * delta * latency; // Clockwise steering corresponds to positive delta
                     v += a * latency;
                     
                     // Transform waypoints (ptsx[i], ptsy[i]) from map coordinates
                     // to vehicle coordinates (ptsx_veh[i], ptsy_veh[i])
-                    vector<double> ptsx_veh;
-                    vector<double> ptsy_veh;
-                    int n_pts = ptsx.size();
-                    for (int i = 0; i < n_pts; i++) {
-                        double shift_x = ptsx[i] - px;
-                        double shift_y = ptsy[i] - py;
-                        ptsx_veh.push_back(shift_x * cos(psi) + shift_y * sin(psi));
-                        ptsy_veh.push_back(shift_x * (-sin(psi)) + shift_y * cos(psi));
-                    }
+                    vector<double> ptsx_veh, ptsy_veh;
+                    std::tie(ptsx_veh, ptsy_veh) = transformCoord(ptsx, ptsy, px, py, psi);
                     // Cast std::vector to Eigen::VectorXd
                     double * ptr_vx = &ptsx_veh[0];
                     double * ptr_vy = &ptsy_veh[0];
+                    int n_pts = ptsx.size();
                     Eigen::Map<Eigen::VectorXd> v_ptsx_veh(ptr_vx, n_pts);
                     Eigen::Map<Eigen::VectorXd> v_ptsy_veh(ptr_vy, n_pts);
                     
@@ -203,7 +215,13 @@ int main() {
                     //
                     // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
                     // SUBMITTING.
-                    this_thread::sleep_for(chrono::milliseconds(100));
+                    this_thread::sleep_for(chrono::milliseconds(140));
+                    
+                    // Measure latency duration
+                    auto clock_stop = chrono::system_clock::now();
+                    chrono::duration<double, std::milli> timetaken = clock_stop - clock_start;
+                    std::cout << "Latency duration (milli second): " << timetaken.count() << std::endl;
+                    
                     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                 }
             } else {

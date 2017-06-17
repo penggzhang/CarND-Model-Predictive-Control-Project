@@ -1209,6 +1209,8 @@ MPC.h
 /Users/betterlife/car/Project/CarND-MPC-Project/src/MPC.h
 json.hpp
 /Users/betterlife/car/Project/CarND-MPC-Project/src/json.hpp
+tuple
+-
 
 /usr/local/include/coin/IpAlgTypes.hpp
 IpTypes.hpp
